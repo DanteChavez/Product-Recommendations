@@ -75,17 +75,17 @@ namespace Recommendations.WebJob
             Trace.TraceVerbose($"Starting monitoring model '{modelId}' status to cancel the training if model is deleted");
             using (StartModelStatusMonitor(modelId, cancellationTokenSource))
             {
-                Trace.TraceInformation("Starting model training");
+                Trace.TraceInformation("Inicia el Entrenamiento del Modelo");
                 if (await TrainModelAsync(modelId, model.Parameters, cancellationTokenSource.Token))
                 {
-                    Trace.TraceInformation("Model training completed successfully.");
+                    Trace.TraceInformation("El Entrenamiento del Modelo ha concluido satisfactoriamente.");
 
                     // if a default model is not defined, set the newly built model as the default
                     await TrySettingDefaultModelIfEmpty(modelId, cancellationTokenSource.Token);
                 }
             }
 
-            Trace.TraceInformation("Model training completed successfully");
+            Trace.TraceInformation("El Entrenamiento del Modelo ha concluido satisfactoriamente");
         }
 
         /// <summary>
