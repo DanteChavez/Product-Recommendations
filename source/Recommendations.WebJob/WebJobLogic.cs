@@ -48,31 +48,31 @@ namespace Recommendations.WebJob
         /// <param name="cancellationToken">A cancellation token used to abort the operation</param>
         public async Task TrainModelAsync(Guid modelId, CancellationToken cancellationToken)
         {
-            Trace.TraceInformation("Getting model from model registry");
+            Trace.TraceInformation("Obteniendo el modelo desde el registro");
             Model model = await _modelsRegistry.GetModelAsync(modelId, cancellationToken);
             if (model == null)
             {
-                Trace.TraceInformation("Model doesn't exist (deleted?) - skipping build model");
+                Trace.TraceInformation("El Modelo no existe (¿fue borrado?) - omitiendo construcción del modelo");
                 return;
             }
 
             // check if model is ready for build 
             if (model.Status == ModelStatus.Completed || model.Status == ModelStatus.Failed)
             {
-                Trace.TraceInformation($"Skipping model build. Model Status : {model.Status}");
+                Trace.TraceInformation($"Omitiendo construcción del modelo. Estado del Modelo : {model.Status}");
                 return;
             }
 
             // updated the model status to 'in progress'
-            Trace.TraceInformation($"Updating model status to {ModelStatus.InProgress}");
+            Trace.TraceInformation($"Actualizando el modelo a {ModelStatus.InProgress}");
             await _modelsRegistry.UpdateModelAsync(modelId, cancellationToken,
-                ModelStatus.InProgress, "Starting Model Training");
+                ModelStatus.InProgress, "Iniciando Entrenamiento del Modelo");
 
             // create a new cancellation token source that is linked to the provided cancellation token
             var cancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
             // create timer to periodically poll table to see if the model was deleted
-            Trace.TraceVerbose($"Starting monitoring model '{modelId}' status to cancel the training if model is deleted");
+            Trace.TraceVerbose($"Iniciando monitoreo del estado del modelo '{modelId}' para cancelar el entrenamiento si este es eliminado");
             using (StartModelStatusMonitor(modelId, cancellationTokenSource))
             {
                 Trace.TraceInformation("Inicia el Entrenamiento del Modelo");
@@ -99,20 +99,20 @@ namespace Recommendations.WebJob
             {
                 try
                 {
-                    Trace.TraceVerbose($"Model Status Monitor: Trying to get the model '{modelId}' from the registry");
+                    Trace.TraceVerbose($"Monitor de Estado del Modelo: Intentado obtener el modelo '{modelId}' del registro");
                     Model model = _modelsRegistry.GetModel(modelId);
 
                     // if the model was deleted, cancel the model training
                     if (model == null)
                     {
-                        Trace.TraceInformation($"Model Status Monitor: Model '{modelId}' was deleted from the registry - aborting the model training");
+                        Trace.TraceInformation($"Monitor de Estado del Modelo: El Modelo '{modelId}' ha sido eliminado del registro - abortando el entrenamiento del modelo");
                         trainingCancellationTokenSource.Cancel();
                     }
                 }
                 catch (Exception ex)
                 {
                     // log and ignore error
-                    Trace.TraceWarning($"Model Status Monitor: Exception while trying to get model status. Exception: {ex}");
+                    Trace.TraceWarning($"Monitor de Estado del Modelo: Excepción al intentar obtener el estado del modelo. Excepción: {ex}");
                 }
             };
 
@@ -137,21 +137,21 @@ namespace Recommendations.WebJob
             Action<string> progressMessageHandler = progressMessage => ModelTrainingProgressMessagesEventHandler(
                 progressMessage, modelId, ongoingUpdateEvent, cancellationToken);
             
-            Trace.TraceInformation($"Starting model '{modelId}' training");
+            Trace.TraceInformation($"Iniciando entrenamiento del modelo '{modelId}'.");
             ModelTrainResult result = await _modelsProvider.TrainAsync(
                 modelId, parameters, progressMessageHandler, cancellationToken);
 
             // get the model status
             ModelStatus newModelStatus = result.IsCompletedSuccessfuly ? ModelStatus.Completed : ModelStatus.Failed;
-            Trace.TraceInformation($"Model training completed with status '{newModelStatus}'");
+            Trace.TraceInformation($"Entrenamiento del Modelo completado con estado '{newModelStatus}'");
 
-            Trace.TraceInformation("Extracting model statistics from the model training result");
+            Trace.TraceInformation("Extrayendo estadísticas de los resultados de entrenamiento del modelo");
             ModelStatistics modelStatistics = CreateModelStatistics(result, parameters);
 
-            Trace.TraceInformation("Wait for any ongoing model status message updates before updating the final status");
+            Trace.TraceInformation("Espere a que se actualice el mensaje de estado del modelo en curso antes de actualizar el estado final");
             ongoingUpdateEvent.WaitOne();
 
-            Trace.TraceInformation("Update the model status and statistics to the registry");
+            Trace.TraceInformation("Actualice el estado del modelo y estadisticas al registro");
             await _modelsRegistry.UpdateModelAsync(modelId, cancellationToken,
                 newModelStatus, result.CompletionMessage, modelStatistics);
 
@@ -170,17 +170,17 @@ namespace Recommendations.WebJob
             try
             {
                 Trace.TraceVerbose(
-                    "Waiting for any previous model status message update to complete (if still ongoing)");
+                    "Esperando que se complete algun mensaje de actualizacion de estado del modelo (si se continuan en marcha)");
                ongoingUpdateEvent.WaitOne();
 
-                Trace.TraceVerbose($"Updating the model '{modelId}' status message to '{progressMessage}'");
+                Trace.TraceVerbose($"Actualizaondo el mensaje del estado del modelo '{modelId}' a '{progressMessage}'");
                 await _modelsRegistry.UpdateModelAsync(modelId, cancellationToken, statusMessage: progressMessage);
             }
             catch (Exception e)
             {
                 // ignore exceptions thrown while trying to update status message
                 Trace.TraceInformation(
-                    $"Failed updating model status message to '{progressMessage}', skipping. Exception: {e}");
+                    $"Fallo en actualizar el estado del modelo a '{progressMessage}', omitiendo. Excepcion: {e}");
             }
             finally
             {
@@ -199,13 +199,13 @@ namespace Recommendations.WebJob
                 var defaultModelId = await _modelsRegistry.GetDefaultModelIdAsync(cancellationToken);
                 if (defaultModelId == null)
                 {
-                    Trace.TraceInformation($"Default model is not defined - setting model '{modelId}' as the default model");
+                    Trace.TraceInformation($"El modelo por defecto no esta definido - ajustando el modelo '{modelId}' como modelo por defecto");
                     await _modelsRegistry.SetDefaultModelIdAsync(modelId, cancellationToken);
                 }
             }
             catch (Exception exception)
             {
-                Trace.TraceWarning($"Skipping setting model as the default model (if non defined) due to exception: {exception}");
+                Trace.TraceWarning($"Omitiendo ajustar el modelo por defecto (si no está definido) por la excepcion: {exception}");
             }
         }
 
